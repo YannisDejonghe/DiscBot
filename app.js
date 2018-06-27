@@ -5,7 +5,7 @@ const client = new Discord.Client();
 
 
 const config = require("./config.json");
-
+const translate = require('google-translate-api');
 
 
 client.on("ready", () => {
@@ -40,9 +40,15 @@ client.on("message", async message => {
     m.edit(`Pong! Latency is ${m.createdTimestamp - message.createdTimestamp}ms. API Latency is ${Math.round(client.ping)}ms`);
   }
 
-  function calc(){
-    let som = args.slice(0) + args.slice(1);
-    message.channel.send(som);
+  if (command === "translate"){
+    let lang = args[0];
+    let text = args.slice(1).join(" ");
+    translate(text, {to: lang}).then(res => {
+      message.channel.send(res.text);
+  }).catch(err => {
+     throw(err);
+  });
+
   }
 
   if(command === "calc"){
