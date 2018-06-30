@@ -1,10 +1,24 @@
+require('dotenv').config();
+
+const Sequelize = require('sequelize');
+const db = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASS, {
+  host: process.env.DB_HOST,
+  dialect: 'mysql',
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000
+  },
+  operatorsAliases: false,
+  logging: false
+});
 
 const Discord = require("discord.js");
-
 const client = new Discord.Client();
 
-const config = require("./config.json");
 const commands = require('./commands')(client);
+const game = require('./game')(client, db);
 
 client.on("ready", () => {
 
@@ -27,12 +41,16 @@ client.on("guildDelete", guild => {
 
 client.on("message", async (message) => {
   if (message.author.bot) return;
-  if (message.content.indexOf(config.prefix) !== 0) return;
-  const args = message.content.slice(config.prefix.length).trim().split(/ +/g);
+  if (message.content.indexOf(process.env.PREFIX) !== 0) return;
+  const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/g);
   const command = args.shift().toLowerCase();
 
   if (command in commands) {
     commands[command](message, args);
+  }
+
+  if (command in game) {
+    game[command](message, args);
   }
 });
 
@@ -40,4 +58,6 @@ client.on("message", async (message) => {
   client.channels.get(channel.id).send('Stop met typen!');
 });*/
 
-client.login(config.token);
+db.sync().then(() => {
+  client.login(process.env.DISCORD_TOKEN);
+});
