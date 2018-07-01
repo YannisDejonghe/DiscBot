@@ -96,7 +96,7 @@ function whatcanibuy(message, args){
   Players.findOne({where: {player_id: message.author.id + message.guild.id}}).then((player) => {
     if(player){
       Weapons.findAll().then(weapons => {
-        let result = weapons.filter(elem => parseInt(elem.sell) < parseInt(player.gems))
+        let result = weapons.filter(elem => parseInt(elem.buy) < parseInt(player.gems))
             .map(e => e.name);
         message.channel.send("**Available weapons**\n" + result.join("\n"));
       })
