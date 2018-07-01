@@ -3,7 +3,8 @@ const cmds =  {
   join: join,
   info: info,
   shop: shop,
-  stats: stats
+  stats: stats,
+  whatcanibuy:whatcanibuy
 };
 let client;
 
@@ -89,6 +90,22 @@ function shop(message, args) {
     message.channel.send("**Weapons**\n" + wpns.join("\n"));
   });
 }
+
+
+function whatcanibuy(message, args){
+  Players.findOne({where: {player_id: message.author.id + message.guild.id}}).then((player) => {
+    if(player){
+      Weapons.findAll().then(weapons => {
+        let result = weapons.filter(elem => parseInt(elem.sell) < parseInt(player.gems))
+            .map(e => e.name);
+        message.channel.send("**Available weapons**\n" + result.join("\n"));
+      })
+    }
+  });
+}
+  
+  
+  
 
 module.exports = (discordclient, db) => {
   Players = db.define('player', {
