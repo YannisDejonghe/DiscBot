@@ -11,6 +11,9 @@ let client;
 //Database entities
 let Players;
 let Weapons;
+let Enemies
+
+
 
 function initialize() {
   let inits = {
@@ -29,6 +32,31 @@ function initialize() {
         buy: 45,
         sell: 20
       }
+    ],
+    enemies: [
+      {
+          type: "Creature",
+          name: "Centaur",
+          hitpoints: 1500,
+          combat_lvl: 48,
+          strength_lvl: 15,
+          archery_lvl: 10,
+          defence_lvl: 15,
+          weakness: "none"
+      },
+      {
+        type: "Creature",
+        name: "Duck",
+        hitpoints: 500,
+        combat_lvl: 19,
+        strength_lvl: 10,
+        archery_lvl: 0,
+        defence_lvl: 15,
+        weakness: "melee"
+      }
+
+
+
     ]
   }
 
@@ -41,6 +69,12 @@ function initialize() {
     }))
   });
   
+  inits.enemies.forEach((enemy) => {  
+    promises.push(Enemies.findOrCreate({
+      where: enemy,
+      defaults: enemy
+    }))
+  });
   return Promise.all(promises);
 }
 
@@ -126,6 +160,19 @@ module.exports = (discordclient, db) => {
     buy: Sequelize.NUMERIC,
     sell: Sequelize.NUMERIC
   });
+
+  Enemies = db.define('enemy', {
+    enemy_id: Sequelize.NUMERIC,
+    type : Sequelize.STRING, // boss or creature
+    name : Sequelize.STRING,
+    hitpoints: Sequelize.NUMERIC,
+    combat_lvl: Sequelize.NUMERIC,
+    strength_lvl: Sequelize.NUMERIC,
+    archery_lvl: Sequelize.NUMERIC,
+    defence_lvl: Sequelize.NUMERIC,
+    weakness : Sequelize.STRING
+
+  })
 
   client = discordclient;
 
