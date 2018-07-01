@@ -32,10 +32,19 @@ function info(message, args) {
 
 }
 
+
+
+
 module.exports = (discordclient, db) => {
   Players = db.define('player', {
     player_id: Sequelize.STRING,
-    gems: Sequelize.NUMERIC
+    gems: Sequelize.NUMERIC,
+    hitpoints: Sequelize.NUMERIC,
+    combat_lvl: Sequelize.NUMERIC,
+    strength_lvl: Sequelize.NUMERIC,
+    archery_lvl: Sequelize.NUMERIC,
+    defence_lvl: Sequelize.NUMERIC,
+    crafting_lvl: Sequelize.NUMERIC,
   });
 
   client = discordclient;

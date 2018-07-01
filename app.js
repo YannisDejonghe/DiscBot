@@ -59,5 +59,7 @@ client.on("message", async (message) => {
 });*/
 
 db.sync().then(() => {
+
   client.login(process.env.DISCORD_TOKEN);
+  db.sync({alter: true})
 });
