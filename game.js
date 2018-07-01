@@ -35,23 +35,11 @@ function initialize() {
 
   inits.weapons.forEach((weapon) => {  
     promises.push(Weapons.findOrCreate({
-      where: {
-        name: weapon.name,
-        mindmg: weapon.mindmg,
-        maxdmg: weapon.maxdmg,
-        buy: weapon.buy,
-        sell: weapon.sell
-      },
-      defaults: {
-        name: weapon.name,
-        mindmg: weapon.mindmg,
-        maxdmg: weapon.maxdmg,
-        buy: weapon.buy,
-        sell: weapon.sell
-      }
-    }));
+      where: weapon,
+      defaults: weapon
+    }))
   });
-
+  
   return Promise.all(promises);
 }
 
