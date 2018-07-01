@@ -49,8 +49,8 @@ client.on("message", async (message) => {
     commands[command](message, args);
   }
 
-  if (command in game) {
-    game[command](message, args);
+  if (command in game.commands) {
+    game.commands[command](message, args);
   }
 });
 
@@ -58,8 +58,6 @@ client.on("message", async (message) => {
   client.channels.get(channel.id).send('Stop met typen!');
 });*/
 
-db.sync().then(() => {
-
-  client.login(process.env.DISCORD_TOKEN);
-  db.sync({alter: true})
-});
+db.sync({alter: true})
+  .then(game.initialize)
+  .then(client.login(process.env.DISCORD_TOKEN));
