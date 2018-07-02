@@ -3,14 +3,20 @@ const cmds =  {
   join: join,
   info: info,
   shop: shop,
-  stats: stats
+  stats: stats,
+  spawn: spawn,
+  attack: attack
 };
 let client;
 
 //Database entities
 let Player;
+let PlayerWeapon;
 let Weapon;
 let Enemy;
+
+let currentEnemy;
+let currentEnemyDamages = {};
 
 function initialize() {
   let inits = {
@@ -53,9 +59,6 @@ function initialize() {
         defence_lvl: 15,
         weakness: "melee"
       }
-
-
-
     ]
   }
 
@@ -118,22 +121,27 @@ function stats(message, args) {
 }
 
 function shop(message, args) {
-  Player.findOne({where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
+  Player.findOne({include: [{model: Weapon}], where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
     if(player){    
       Weapon.findAll().then(weapons => {
         let wpns = weapons;
+        let weaponName = args.slice(1).join(' ');
 
         if (args[0] === "affordable") {
           wpns = wpns.filter(weapon => parseInt(weapon.buy) <= parseInt(player.gems));
-        } else if (args[0] === "buy" && args[1]) {
-          let weapon = wpns.find(weapon => weapon.name.toLowerCase() === args[1].toLowerCase());
+        } 
+        
+        if (args[0] === "buy" && weaponName) {
+          let weapon = wpns.find(weapon => weapon.name.toLowerCase() === weaponName.toLowerCase());
 
           if (weapon) {
             if (parseInt(weapon.buy) <= parseInt(player.gems)) {
               player.gems = parseInt(player.gems) - parseInt(weapon.buy);
-              player.weaponId = weapon.id;
-
-              player.save().then(() => {
+              
+              player.setWeapons([weapon]).then(() => {
+                return player.save();
+              })
+              .then(() => {
                 message.channel.send(weapon.name + " bought succesfully.");
               });
             } else {
@@ -149,6 +157,61 @@ function shop(message, args) {
       });
     }
   });
+}
+
+function spawn(message, args) {
+  Enemy.findAll().then((enemies) => {
+    currentEnemy = enemies[0]; //todo: randomize
+
+    message.channel.send(`A ${currentEnemy.name} appeared with ${currentEnemy.hitpoints} HP!`);
+  });
+}
+
+function attack(message, args) {
+  if (currentEnemy) {
+    Player.findOne({include: [{model: Weapon}], where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
+      if (player && player.weapons) {
+        if (currentEnemyDamages[message.author.id]) {
+          if (new Date() - currentEnemyDamages[message.author.id].lastattack < 5000) {
+            message.channel.send(`${message.author}, you're attacking too quickly!`);
+            return;
+          }
+        }
+
+        let damageDealt = player.weapons[0].maxdmg;
+        currentEnemy.hitpoints -= damageDealt;
+  
+        if (currentEnemyDamages[message.author.id]) {
+          currentEnemyDamages[message.author.id].damage += parseInt(damageDealt);
+          currentEnemyDamages[message.author.id].lastattack = new Date();
+        } else {
+          currentEnemyDamages[message.author.id] = {
+            author: message.author,
+            damage: parseInt(damageDealt),
+            lastattack: new Date()
+          }
+        }
+
+        if (currentEnemy.hitpoints <= 0) {
+          let damageTally = [];
+
+          for (let key in currentEnemyDamages) {
+            let value = currentEnemyDamages[key];
+
+            damageTally.push(value.author + ": " + value.damage);
+          }
+
+          message.channel.send(`${currentEnemy.name} was defeated!`);
+          message.channel.send(`**Damage tally**\n${damageTally.join('\n')}`);
+
+          currentEnemy = null;
+          currentEnemyDamages = {};
+        } else {
+          message.channel.send(`${message.author} dealt ${damageDealt} damage to the enemy ${currentEnemy.name}! ${currentEnemy.hitpoints} HP remaining.`);
+        }
+      }
+    });
+  }
 }
   
 module.exports = (discordclient, db) => {
@@ -183,7 +246,17 @@ module.exports = (discordclient, db) => {
     weakness: Sequelize.STRING
   });
 
-  Weapon.hasOne(Player);
+  PlayerWeapon = db.define('playerweapon', {
+    weaponId: Sequelize.NUMERIC,
+    playerId: {
+      type: Sequelize.NUMERIC,
+      unique: true 
+    },
+    durability: Sequelize.NUMERIC
+  });
+
+  Player.belongsToMany(Weapon, {through: PlayerWeapon});
+  //Weapon.belongsToMany(Player, {through: PlayerWeapon});
 
   client = discordclient;
 
