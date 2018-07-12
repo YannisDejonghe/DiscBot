@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const cmds =  {
+const cmds = {
   join: join,
   info: info,
   shop: shop,
@@ -38,15 +38,15 @@ function initialize() {
     ],
     enemies: [
       {
-          type: "Creature",
-          name: "Centaur",
-          hitpoints: 1500,
-          combat_lvl_min: 44,
-          combat_lvl_max: 52,
-          strength_lvl: 15,
-          archery_lvl: 10,
-          defence_lvl: 15,
-          weakness: "none"
+        type: "Creature",
+        name: "Centaur",
+        hitpoints: 1500,
+        combat_lvl_min: 44,
+        combat_lvl_max: 52,
+        strength_lvl: 15,
+        archery_lvl: 10,
+        defence_lvl: 15,
+        weakness: "none"
       },
       {
         type: "Creature",
@@ -64,14 +64,14 @@ function initialize() {
 
   let promises = [];
 
-  inits.weapons.forEach((weapon) => {  
+  inits.weapons.forEach((weapon) => {
     promises.push(Weapon.findOrCreate({
       where: weapon,
       defaults: weapon
     }))
   });
-  
-  inits.enemies.forEach((enemy) => {  
+
+  inits.enemies.forEach((enemy) => {
     promises.push(Enemy.findOrCreate({
       where: enemy,
       defaults: enemy
@@ -81,7 +81,7 @@ function initialize() {
 }
 
 function join(message, args) {
-  Player.findOne({where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
+  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
     if (player) {
       message.channel.send("You've already joined in this server!");
     } else {
@@ -94,56 +94,59 @@ function join(message, args) {
   });
 }
 
+function playerNotRegistered(message) {
+  message.channel.send("You haven't joined this server yet! Write .join to do so.")
+}
+
 function info(message, args) {
-  Player.findOne({where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
+  Player.findOne({ include: [{ model: Weapon }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
     if (player) {
       message.channel.send(message.author + '\n' + player.gems + ' :gem:'
-                                          + '\n' + player.combat_lvl + ' :crossed_swords: '
-                                         //place weapon here
-                                         );
-    }
+        + '\n' + player.combat_lvl + ' :crossed_swords: '
+        + '\n' + 'Equipped weapon: ' + player.weapons[0].name
+      );
+    } else playerNotRegistered(message);
   });
-
 }
 
 function stats(message, args) {
-  Player.findOne({where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
+  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
     if (player) {
-      message.channel.send(message.author + '\n' + player.combat_lvl + ' :crossed_swords: ' 
-                                          + '\n' + player.hitpoints + ' :revolving_hearts: '
-                                          + '\n' + player.strength_lvl + ' :muscle: ' 
-                                          + '\n' + player.archery_lvl + ' :bow_and_arrow: ' 
-                                          + '\n' + player.defence_lvl + ' :shield: ' 
-                                          + '\n' + player.crafting_lvl + ' :poop:'
-                                        );
-    }
+      message.channel.send(message.author + '\n' + player.combat_lvl + ' :crossed_swords: '
+        + '\n' + player.hitpoints + ' :revolving_hearts: '
+        + '\n' + player.strength_lvl + ' :muscle: '
+        + '\n' + player.archery_lvl + ' :bow_and_arrow: '
+        + '\n' + player.defence_lvl + ' :shield: '
+        + '\n' + player.crafting_lvl + ' :poop:'
+      );
+    } else playerNotRegistered(message);
   });
 }
 
 function shop(message, args) {
-  Player.findOne({include: [{model: Weapon}], where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
-    if(player){    
+  Player.findOne({ include: [{ model: Weapon }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+    if (player) {
       Weapon.findAll().then(weapons => {
         let wpns = weapons;
         let weaponName = args.slice(1).join(' ');
 
         if (args[0] === "affordable") {
           wpns = wpns.filter(weapon => parseInt(weapon.buy) <= parseInt(player.gems));
-        } 
-        
+        }
+
         if (args[0] === "buy" && weaponName) {
           let weapon = wpns.find(weapon => weapon.name.toLowerCase() === weaponName.toLowerCase());
 
           if (weapon) {
             if (parseInt(weapon.buy) <= parseInt(player.gems)) {
               player.gems = parseInt(player.gems) - parseInt(weapon.buy);
-              
+
               player.setWeapons([weapon]).then(() => {
                 return player.save();
               })
-              .then(() => {
-                message.channel.send(weapon.name + " bought succesfully.");
-              });
+                .then(() => {
+                  message.channel.send(weapon.name + " bought succesfully.");
+                });
             } else {
               message.channel.send("You can't afford a " + weapon.name + ".");
             }
@@ -152,10 +155,10 @@ function shop(message, args) {
           }
         } else {
           wpns = wpns.map(w => w.name + ", " + w.mindmg + "-" + w.maxdmg + " dmg, buy " + w.buy + " :gem:" + " sell " + w.sell + " :gem:");
-          message.channel.send("**Weapons**\n" + wpns.join("\n"));
+          message.channel.send("Your funds: " + player.gems + " :gem:\n\n" + "**Weapons**\n" + wpns.join("\n"));
         }
       });
-    }
+    } else playerNotRegistered(message);
   });
 }
 
@@ -169,7 +172,7 @@ function spawn(message, args) {
 
 function attack(message, args) {
   if (currentEnemy) {
-    Player.findOne({include: [{model: Weapon}], where: {player_id: message.author.id + ',' + message.guild.id}}).then((player) => {
+    Player.findOne({ include: [{ model: Weapon }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
       if (player && player.weapons) {
         if (currentEnemyDamages[message.author.id]) {
           if (new Date() - currentEnemyDamages[message.author.id].lastattack < 5000) {
@@ -180,7 +183,7 @@ function attack(message, args) {
 
         let damageDealt = player.weapons[0].maxdmg;
         currentEnemy.hitpoints -= damageDealt;
-  
+
         if (currentEnemyDamages[message.author.id]) {
           currentEnemyDamages[message.author.id].damage += parseInt(damageDealt);
           currentEnemyDamages[message.author.id].lastattack = new Date();
@@ -213,17 +216,17 @@ function attack(message, args) {
     });
   }
 }
-  
+
 module.exports = (discordclient, db) => {
   Player = db.define('player', {
     player_id: Sequelize.STRING,
-    gems: {type: Sequelize.NUMERIC, defaultValue: 500},
-    hitpoints: {type: Sequelize.NUMERIC, defaultValue: 1000},
-    combat_lvl: {type: Sequelize.NUMERIC, defaultValue: 35},
-    strength_lvl: {type: Sequelize.NUMERIC, defaultValue: 10},
-    archery_lvl: {type: Sequelize.NUMERIC, defaultValue: 10},
-    defence_lvl: {type: Sequelize.NUMERIC, defaultValue: 10},
-    crafting_lvl: {type: Sequelize.NUMERIC, defaultValue: 10},
+    gems: { type: Sequelize.NUMERIC, defaultValue: 500 },
+    hitpoints: { type: Sequelize.NUMERIC, defaultValue: 1000 },
+    combat_lvl: { type: Sequelize.NUMERIC, defaultValue: 35 },
+    strength_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
+    archery_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
+    defence_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
+    crafting_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
   });
 
   Weapon = db.define('weapon', {
@@ -235,8 +238,8 @@ module.exports = (discordclient, db) => {
   });
 
   Enemy = db.define('enemy', {
-    type : Sequelize.STRING, // boss or creature
-    name : Sequelize.STRING,
+    type: Sequelize.STRING, // boss or creature
+    name: Sequelize.STRING,
     hitpoints: Sequelize.NUMERIC,
     combat_lvl_min: Sequelize.NUMERIC,
     combat_lvl_max: Sequelize.NUMERIC,
@@ -250,12 +253,12 @@ module.exports = (discordclient, db) => {
     weaponId: Sequelize.NUMERIC,
     playerId: {
       type: Sequelize.NUMERIC,
-      unique: true 
+      unique: true
     },
     durability: Sequelize.NUMERIC
   });
 
-  Player.belongsToMany(Weapon, {through: PlayerWeapon});
+  Player.belongsToMany(Weapon, { through: PlayerWeapon });
   //Weapon.belongsToMany(Player, {through: PlayerWeapon});
 
   client = discordclient;
