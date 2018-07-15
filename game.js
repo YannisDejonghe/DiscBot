@@ -5,10 +5,12 @@ const cmds = {
   shop: shop,
   stats: stats,
   spawn: spawn,
-  attack: attack
+  attack: attack,
+  inventory: inventory,
+  equip: equip
 };
 let client;
-
+let sequelize;
 //Database entities
 let Player;
 let PlayerItem;
@@ -22,7 +24,7 @@ function initialize() {
   let inits = {
     enemies: [
       {
-        type: "Creature",
+        type: "Archer",
         name: "Centaur",
         combat_lvl_min: 44,
         combat_lvl_max: 52,
@@ -37,7 +39,7 @@ function initialize() {
         weakness: "none"
       },
       {
-        type: "Creature",
+        type: "Melee",
         name: "Duck",
         combat_lvl_min: 15,
         combat_lvl_max: 23,
@@ -55,6 +57,7 @@ function initialize() {
     items: [
       {
         name: "Shortsword",
+        type: "Weapon",
         buy: 25,
         sell: 10,
         durability: 100,
@@ -65,6 +68,7 @@ function initialize() {
       },
       {
         name: "Evening star",
+        type: "Weapon",
         buy: 45,
         sell: 20,
         durability: 100,
@@ -116,10 +120,13 @@ function playerNotRegistered(message) {
 function info(message, args) {
   Player.findOne({ include: [{ model: Item }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
     if (player) {
-      message.channel.send(message.author + '\n' + player.gems + ' :gem:'
+
+      player.getEquippedWeapon().then((weapon) => {
+        message.channel.send(message.author + '\n' + player.gems + ' :gem:'
         + '\n' + player.combat_lvl + ' :crossed_swords: '
-        + '\n' + 'Equipped weapon: ' + player.items[0].name //TODO: get equipped weapon?
-      );
+        + '\n' + 'Equipped weapon: ' + weapon.dataValues.name //TODO: get equipped weapon?
+        );
+      });
     } else playerNotRegistered(message);
   });
 }
@@ -157,18 +164,22 @@ function shop(message, args) {
               player.gems = parseInt(player.gems) - parseInt(item.buy);
               
               PlayerItem.build({
-                durability: 100,
+                durability: item.durability,
                 playerId: player.id,
                 itemId: item.id
               }).save().then(() => {
-                message.channel.send(item.name + " bought succesfully.");
-              });
-
-              /*player.addItem(item, {through: { durability: 100 } }).then(() => {
                 return player.save();
               }).then(() => {
-                message.channel.send(item.name + " bought succesfully.");
+                return message.channel.send(item.name + " bought succesfully.");
+              });
+
+
+              /*player.addItem(item, {through: { durability: item.durability } }).then(() => {
+                return player.save();
+              }).then(() => {
+                return message.channel.send(item.name + " bought succesfully.");
               });*/
+
 
               //TODO: Fix weapon equip
             } else {
@@ -186,11 +197,45 @@ function shop(message, args) {
   });
 }
 
+function inventory(message, args) {
+  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+    if (player) {
+
+      sequelize.query("SELECT playeritems.id, playeritems.durability, playeritems.equipped, items.name FROM playeritems " + 
+      "JOIN items ON items.id = playeritems.itemId WHERE playerId = ?", 
+      {replacements: [player.id], model: PlayerItem}).then(playerItems => {
+        let inventoryText = playerItems.map(i => `${i.dataValues.id}: ${i.dataValues.name} (durability ${i.durability}) ${i.dataValues.equipped ? '(equipped)' : ''}`)
+        message.author.send(inventoryText.join('\n'));
+      });
+
+      /*PlayerItem.findAll({ include: [{ model: Player }], where: { playerId: player.id } }).then((items) => {
+        let inventoryText = items.map(i => `${i.name} (durability ${i.durability})\n`)
+        message.channel.send(inventoryText);
+      });*/
+    }
+  });
+}
+
+function equip(message, args) {
+  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+    let equipId = parseInt(args[0]);
+
+    if (player) {
+
+      //TODO: get the currently equipped item of itemtype and unequip it first
+      player.equipItem(equipId).then(() => {
+        message.author.send(`Equipped inventory item #${equipId}`)
+      });
+    }
+  });
+}
+
 function spawn(message, args) {
   Enemy.findAll().then((enemies) => {
-    let combatlvl = parseInt(args[0]);
+    let enemyId = parseInt(args[0]);
+    let combatlvl = parseInt(args[1]);
 
-    currentEnemy = enemies[0];//[Math.floor(Math.random() * enemies.length)]; //todo: randomize
+    currentEnemy = enemies[enemyId]; //[Math.floor(Math.random() * enemies.length)];
     currentEnemy.hitpoints = currentEnemy.getStats(combatlvl).hp;
 
     message.channel.send(`A ${currentEnemy.name} appeared with ${currentEnemy.hitpoints} HP! Stats:\n` + currentEnemy.toStatsString(combatlvl));
@@ -245,7 +290,10 @@ function attack(message, args) {
 }
 
 module.exports = (discordclient, db) => {
-  Player = db.define('player', {
+  sequelize = db;
+  client = discordclient;
+
+  Player = sequelize.define('player', {
     player_id: Sequelize.STRING,
     gems: { type: Sequelize.NUMERIC, defaultValue: 500 },
     hitpoints: { type: Sequelize.NUMERIC, defaultValue: 1000 },
@@ -256,8 +304,38 @@ module.exports = (discordclient, db) => {
     crafting_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
   });
 
-  Enemy = db.define('enemy', {
-    type: Sequelize.STRING, // boss or creature
+  Player.prototype.getEquippedWeapon = function() {
+    return sequelize.query("SELECT * FROM playeritems " + 
+    "JOIN items ON items.id = playeritems.itemId WHERE playerId = ? AND items.type = ? AND equipped = true", 
+    {replacements: [this.id, "Weapon"], model: PlayerItem}).then(playerItems => {
+      return new Promise((resolve, reject) => {
+          resolve(playerItems[0]);
+      });
+    });
+  }
+
+  Player.prototype.equipItem = function(itemId) {
+    return sequelize.query("SELECT * FROM playeritems " + 
+    "JOIN items ON items.id = playeritems.itemId WHERE playerId = ? AND playeritems.id = ?", 
+    {replacements: [this.id, itemId], model: PlayerItem}).then(playerItems => {
+      if (playerItems[0]) {
+        let itemType = playerItems[0].dataValues.type;
+
+        return sequelize.query("UPDATE playeritems JOIN items ON items.id = playeritems.itemId SET equipped=false WHERE items.type = ?",
+        {replacements: [itemType], model: PlayerItem, type: Sequelize.QueryTypes.UPDATE}).then(() => {
+          
+          return PlayerItem.find({where: {id: itemId}}).then((playerItem) => {
+            playerItem.equipped = true;
+
+            return playerItem.save();
+          })
+        });
+      }
+    });
+  }
+
+  Enemy = sequelize.define('enemy', {
+    type: Sequelize.STRING,
     name: Sequelize.STRING,
     combat_lvl_min: Sequelize.NUMERIC,
     combat_lvl_max: Sequelize.NUMERIC,
@@ -272,8 +350,9 @@ module.exports = (discordclient, db) => {
     weakness: Sequelize.STRING
   });
 
-  Item = db.define('item', {
+  Item = sequelize.define('item', {
     name: Sequelize.STRING,
+    type: Sequelize.STRING,
     buy: Sequelize.NUMERIC,
     sell: Sequelize.NUMERIC,
     durability : Sequelize.NUMERIC,
@@ -301,20 +380,22 @@ module.exports = (discordclient, db) => {
     return `:muscle::skin-tone-3: ${stats.str}\n :shield: ${stats.def}\n :bow_and_arrow: ${stats.arch}\n`
   }
 
-  PlayerItem = db.define('playeritem', {
+  PlayerItem = sequelize.define('playeritem', {
     id: {
       type: Sequelize.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
-    durability: Sequelize.NUMERIC
+    durability: Sequelize.NUMERIC,
+    equipped: { type: Sequelize.BOOLEAN, defaultValue: false }
   });
 
+  Item.belongsToMany(Player, { through: { model: PlayerItem, unique: false } });
   Player.belongsToMany(Item, { through: { model: PlayerItem, unique: false } });
-  
-  //Weapon.belongsToMany(Player, {through: PlayerWeapon});
 
-  client = discordclient;
+  //Item.belongsToMany(Player, { through: { model: PlayerItem, unique: false } });
+  //Player.belongsToMany(Item, { through: { model: PlayerItem, unique: false } });
+  //Weapon.belongsToMany(Player, {through: PlayerWeapon});
 
   return {
     commands: cmds,
