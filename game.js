@@ -22,8 +22,7 @@ let currentEnemyDamages = {};
 
 function initialize() {
   let inits = {
-    enemies: [
-      {
+    enemies: [{
         type: "Archer",
         name: "Centaur",
         combat_lvl_min: 44,
@@ -54,8 +53,7 @@ function initialize() {
         weakness: "melee"
       }
     ],
-    items: [
-      {
+    items: [{
         name: "Shortsword",
         type: "Weapon",
         buy: 25,
@@ -100,7 +98,11 @@ function initialize() {
 }
 
 function join(message, args) {
-  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+  Player.findOne({
+    where: {
+      player_id: message.author.id + ',' + message.guild.id
+    }
+  }).then((player) => {
     if (player) {
       message.channel.send("You've already joined in this server!");
     } else {
@@ -118,35 +120,56 @@ function playerNotRegistered(message) {
 }
 
 function info(message, args) {
-  Player.findOne({ include: [{ model: Item }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+  Player.findOne({
+    include: [{
+      model: Item
+    }],
+    where: {
+      player_id: message.author.id + ',' + message.guild.id
+    }
+  }).then((player) => {
     if (player) {
 
       player.getEquippedWeapon().then((weapon) => {
-        message.channel.send(message.author + '\n' + player.gems + ' :gem:'
-        + '\n' + player.combat_lvl + ' :crossed_swords: '
-        + '\n' + 'Equipped weapon: ' + weapon.dataValues.name //TODO: get equipped weapon?
-        );
+        if (weapon) {
+          message.channel.send(message.author + '\n' + player.gems + ' :gem:' +
+            '\n' + player.combat_lvl + ' :crossed_swords: ' +
+            '\n' + 'Equipped weapon: ' + weapon.dataValues.name //TODO: get equipped weapon?
+          )
+        };
       });
+
     } else playerNotRegistered(message);
   });
 }
 
 function stats(message, args) {
-  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+  Player.findOne({
+    where: {
+      player_id: message.author.id + ',' + message.guild.id
+    }
+  }).then((player) => {
     if (player) {
-      message.channel.send(message.author + '\n' + player.combat_lvl + ' :crossed_swords: '
-        + '\n' + player.hitpoints + ' :revolving_hearts: '
-        + '\n' + player.strength_lvl + ' :muscle: '
-        + '\n' + player.archery_lvl + ' :bow_and_arrow: '
-        + '\n' + player.defence_lvl + ' :shield: '
-        + '\n' + player.crafting_lvl + ' :poop:'
+      message.channel.send(message.author + '\n' + player.combat_lvl + ' :crossed_swords: ' +
+        '\n' + player.hitpoints + ' :revolving_hearts: ' +
+        '\n' + player.strength_lvl + ' :muscle: ' +
+        '\n' + player.archery_lvl + ' :bow_and_arrow: ' +
+        '\n' + player.defence_lvl + ' :shield: ' +
+        '\n' + player.crafting_lvl + ' :poop:'
       );
     } else playerNotRegistered(message);
   });
 }
 
 function shop(message, args) {
-  Player.findOne({ include: [{ model: Item }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+  Player.findOne({
+    include: [{
+      model: Item
+    }],
+    where: {
+      player_id: message.author.id + ',' + message.guild.id
+    }
+  }).then((player) => {
     if (player) {
       Item.findAll().then(items => {
         let itms = items;
@@ -162,7 +185,7 @@ function shop(message, args) {
           if (item) {
             if (parseInt(item.buy) <= parseInt(player.gems)) {
               player.gems = parseInt(player.gems) - parseInt(item.buy);
-              
+
               PlayerItem.build({
                 durability: item.durability,
                 playerId: player.id,
@@ -198,14 +221,24 @@ function shop(message, args) {
 }
 
 function inventory(message, args) {
-  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+  Player.findOne({
+    where: {
+      player_id: message.author.id + ',' + message.guild.id
+    }
+  }).then((player) => {
     if (player) {
 
-      sequelize.query("SELECT playeritems.id, playeritems.durability, playeritems.equipped, items.name FROM playeritems " + 
-      "JOIN items ON items.id = playeritems.itemId WHERE playerId = ?", 
-      {replacements: [player.id], model: PlayerItem}).then(playerItems => {
+      sequelize.query("SELECT playeritems.id, playeritems.durability, playeritems.equipped, items.name FROM playeritems " +
+        "JOIN items ON items.id = playeritems.itemId WHERE playerId = ?", {
+          replacements: [player.id],
+          model: PlayerItem
+        }).then(playerItems => {
         let inventoryText = playerItems.map(i => `${i.dataValues.id}: ${i.dataValues.name} (durability ${i.durability}) ${i.dataValues.equipped ? '(equipped)' : ''}`)
-        message.author.send(inventoryText.join('\n'));
+        if (inventoryText.length < 1) {
+          message.author.send("inventory empty");
+        } else {
+          message.author.send(inventoryText.join('\n'));
+        }
       });
 
       /*PlayerItem.findAll({ include: [{ model: Player }], where: { playerId: player.id } }).then((items) => {
@@ -217,7 +250,11 @@ function inventory(message, args) {
 }
 
 function equip(message, args) {
-  Player.findOne({ where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+  Player.findOne({
+    where: {
+      player_id: message.author.id + ',' + message.guild.id
+    }
+  }).then((player) => {
     let equipId = parseInt(args[0]);
 
     if (player) {
@@ -244,7 +281,14 @@ function spawn(message, args) {
 
 function attack(message, args) {
   if (currentEnemy) {
-    Player.findOne({ include: [{ model: Weapon }], where: { player_id: message.author.id + ',' + message.guild.id } }).then((player) => {
+    Player.findOne({
+      include: [{
+        model: Weapon
+      }],
+      where: {
+        player_id: message.author.id + ',' + message.guild.id
+      }
+    }).then((player) => {
       if (player && player.weapons) {
         if (currentEnemyDamages[message.author.id]) {
           if (new Date() - currentEnemyDamages[message.author.id].lastattack < 5000) {
@@ -295,36 +339,68 @@ module.exports = (discordclient, db) => {
 
   Player = sequelize.define('player', {
     player_id: Sequelize.STRING,
-    gems: { type: Sequelize.NUMERIC, defaultValue: 500 },
-    hitpoints: { type: Sequelize.NUMERIC, defaultValue: 1000 },
-    combat_lvl: { type: Sequelize.NUMERIC, defaultValue: 35 },
-    strength_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
-    archery_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
-    defence_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
-    crafting_lvl: { type: Sequelize.NUMERIC, defaultValue: 10 },
+    gems: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 500
+    },
+    hitpoints: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 1000
+    },
+    combat_lvl: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 35
+    },
+    strength_lvl: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 10
+    },
+    archery_lvl: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 10
+    },
+    defence_lvl: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 10
+    },
+    crafting_lvl: {
+      type: Sequelize.NUMERIC,
+      defaultValue: 10
+    },
   });
 
-  Player.prototype.getEquippedWeapon = function() {
-    return sequelize.query("SELECT * FROM playeritems " + 
-    "JOIN items ON items.id = playeritems.itemId WHERE playerId = ? AND items.type = ? AND equipped = true", 
-    {replacements: [this.id, "Weapon"], model: PlayerItem}).then(playerItems => {
+  Player.prototype.getEquippedWeapon = function () {
+    return sequelize.query("SELECT * FROM playeritems " +
+      "JOIN items ON items.id = playeritems.itemId WHERE playerId = ? AND items.type = ? AND equipped = true", {
+        replacements: [this.id, "Weapon"],
+        model: PlayerItem
+      }).then(playerItems => {
       return new Promise((resolve, reject) => {
-          resolve(playerItems[0]);
+        resolve(playerItems[0]);
       });
     });
   }
 
-  Player.prototype.equipItem = function(itemId) {
-    return sequelize.query("SELECT * FROM playeritems " + 
-    "JOIN items ON items.id = playeritems.itemId WHERE playerId = ? AND playeritems.id = ?", 
-    {replacements: [this.id, itemId], model: PlayerItem}).then(playerItems => {
+  Player.prototype.equipItem = function (itemId) {
+    return sequelize.query("SELECT * FROM playeritems " +
+      "JOIN items ON items.id = playeritems.itemId WHERE playerId = ? AND playeritems.id = ?", {
+        replacements: [this.id, itemId],
+        model: PlayerItem
+      }).then(playerItems => {
       if (playerItems[0]) {
         let itemType = playerItems[0].dataValues.type;
 
-        return sequelize.query("UPDATE playeritems JOIN items ON items.id = playeritems.itemId SET equipped=false WHERE items.type = ?",
-        {replacements: [itemType], model: PlayerItem, type: Sequelize.QueryTypes.UPDATE}).then(() => {
-          
-          return PlayerItem.find({where: {id: itemId}}).then((playerItem) => {
+        return sequelize.query("UPDATE playeritems JOIN items ON items.id = playeritems.itemId SET equipped=false WHERE items.type = ?", {
+          replacements: [itemType],
+          model: PlayerItem,
+          type: Sequelize.QueryTypes.UPDATE
+        }).then(() => {
+
+          return PlayerItem.find({
+            where: {
+              id: itemId
+            }
+          }).then((playerItem) => {
             playerItem.equipped = true;
 
             return playerItem.save();
@@ -355,17 +431,17 @@ module.exports = (discordclient, db) => {
     type: Sequelize.STRING,
     buy: Sequelize.NUMERIC,
     sell: Sequelize.NUMERIC,
-    durability : Sequelize.NUMERIC,
+    durability: Sequelize.NUMERIC,
     data: Sequelize.JSON
   });
 
-  Enemy.prototype.calcLinear = function(combatlvl, base, growth) {
+  Enemy.prototype.calcLinear = function (combatlvl, base, growth) {
     return Math.floor(parseFloat(growth) * combatlvl + parseFloat(base))
   }
 
-  Enemy.prototype.getStats = function(combatlvl) {
+  Enemy.prototype.getStats = function (combatlvl) {
     let self = this;
-    
+
     return {
       str: self.calcLinear(combatlvl, self.base_str, self.str),
       def: self.calcLinear(combatlvl, self.base_def, self.def),
@@ -374,7 +450,7 @@ module.exports = (discordclient, db) => {
     }
   }
 
-  Enemy.prototype.toStatsString = function(combatlvl) {
+  Enemy.prototype.toStatsString = function (combatlvl) {
     let stats = this.getStats(combatlvl)
 
     return `:muscle::skin-tone-3: ${stats.str}\n :shield: ${stats.def}\n :bow_and_arrow: ${stats.arch}\n`
@@ -387,11 +463,24 @@ module.exports = (discordclient, db) => {
       autoIncrement: true
     },
     durability: Sequelize.NUMERIC,
-    equipped: { type: Sequelize.BOOLEAN, defaultValue: false }
+    equipped: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false
+    }
   });
 
-  Item.belongsToMany(Player, { through: { model: PlayerItem, unique: false } });
-  Player.belongsToMany(Item, { through: { model: PlayerItem, unique: false } });
+  Item.belongsToMany(Player, {
+    through: {
+      model: PlayerItem,
+      unique: false
+    }
+  });
+  Player.belongsToMany(Item, {
+    through: {
+      model: PlayerItem,
+      unique: false
+    }
+  });
 
   //Item.belongsToMany(Player, { through: { model: PlayerItem, unique: false } });
   //Player.belongsToMany(Item, { through: { model: PlayerItem, unique: false } });
